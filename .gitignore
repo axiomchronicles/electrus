@@ -1,0 +1,30 @@
+# Ignore the .env folder
+.env/
+
+# Ignore all __pycache__ folders recursively
+**/__pycache__/
+
+# Other common Python-related ignores
+*.py[cod]
+*.pyo
+.Python
+env/
+venv/
+ENV/
+VirtualEnv/
+venv.bak/
+env.bak/
+
+# Byte-compiled / optimized / DLL files
+*.pyc
+*.pyd
+*.pyo
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VSCode workspace settings (optional)
+.vscode/
+
+# macOS files (optional)
+.DS_Store
