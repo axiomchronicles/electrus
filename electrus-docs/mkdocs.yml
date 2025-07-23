@@ -1,0 +1,115 @@
+site_name: Electrus NoSQL Database
+site_description: "Electrus is a modular, MongoDB-style in-memory NoSQL database with persistent storage and ACID-like transactions."
+site_url: https://your-electrus-docs-site.com
+repo_url: https://github.com/axiomchronicles/electrus
+repo_name: GitHub
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: en
+  favicon: assets/favicon.ico
+  logo: assets/logo.png
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.tracking
+    - navigation.top
+    - toc.integrate
+    - toc.follow
+    - content.code.copy
+    - content.code.annotate
+    - header.autohide
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+  palette:
+    - scheme: slate
+      primary: black
+      accent: lime
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - scheme: default
+      primary: black
+      accent: lime
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+  font:
+    text: Roboto
+    code: Fira Code
+
+nav:
+  - 🏠 Home: index.md
+  - 🚀 Getting Started: getting-started.md
+  - ⚙️ Architecture:
+      - Overview: architecture.md
+      - File Handling: file_handling.md
+      - InsertData Logic: insert-data.md
+  - 🧠 Query Engine: query-engine.md
+  - File Handling: file_handling.md
+  - 📂 Persistence:
+      - File Structure: persistence/file-structure.md
+      - ACID Transactions: persistence/transactions.md
+  - 🧪 Testing & Examples: testing.md
+  - 🧾 API Reference:
+      - ElectrusClient: api/client.md
+      - Database: api/database.md
+      - Collection: api/collection.md
+  - 🧩 Plugins & Middleware: plugins.md
+  - 🤝 Contributing: contributing.md
+  - 🗒️ Changelog: changelog.md
+
+markdown_extensions:
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - admonition
+  - attr_list
+  - def_list
+  - md_in_html
+  - footnotes
+  - tables
+  - abbr
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.keys
+  - pymdownx.critic
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.magiclink
+  - pymdownx.betterem
+
+plugins:
+  - search
+  - tags
+
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/yourusername/electrus
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/electrus/
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/your-community
+  status:
+    draft: 🧪 Draft
+    new: 🆕 New
+    deprecated: 🛑 Deprecated
+  version:
+    provider: mike
+
+extra_css:
+  - assets/styles/custom.css
+
+extra_javascript:
+  - assets/scripts/custom.js

@@ -1,0 +1,59 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
+.env/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Test results
+.coverage
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+htmlcov/
+
+# Pytest / unittest cache
+.pytest_cache/
+
+# VS Code settings
+.vscode/
+
+# PyCharm settings
+.idea/
+
+# OS / Editor specific
+.DS_Store
+Thumbs.db
+
+# Local config
+*.local
+*.log
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Electrus DB file dumps (optional)
+~/.electrus/
