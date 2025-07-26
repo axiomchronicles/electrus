@@ -1,5 +1,5 @@
 from typing import Any, Dict, List, Optional, Union
-from ...exception.base import ElectrusException
+from ..exception.base import ElectrusException
 from ..partials import ElectrusLogicalOperators
 
 import aiofiles

@@ -1,0 +1,19 @@
+{
+  "name": "config_backup",
+  "timestamp": "2025-07-24T14:12:29.476917",
+  "files": [
+    {
+      "path": "advanced_fs/config.json",
+      "size": 41,
+      "checksum": "5227e72bafb56746b815746e1a59ec056141802064f4545d56ef6fa46c2dfdf0",
+      "backup_path": "config_backup/config.json"
+    },
+    {
+      "path": "advanced_fs/async_1.txt",
+      "size": 21,
+      "checksum": "c30710534af69bef5481a242707c4ca16054d0fa814793cba0b92e9c962bc6af",
+      "backup_path": "config_backup/async_1.txt"
+    }
+  ],
+  "total_size": 62
+}

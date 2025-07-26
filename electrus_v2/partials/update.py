@@ -2,8 +2,8 @@ import json
 import aiofiles
 
 from typing import Any, Dict, Union
-from ...exception.base import ElectrusException
-from .result import DatabaseActionResult
+from ..exception.base import ElectrusException
+from .results import DatabaseActionResult
 from .operators import ElectrusLogicalOperators, ElectrusUpdateOperators
 
 class UpdateData:

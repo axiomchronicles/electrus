@@ -310,7 +310,6 @@ class Transactions:
         return await self.collection.find_one(
             filter_query, 
             projection, 
-            session=self.session
         )
 
     async def count_documents(self, filter_query: Dict[str, Any]) -> int:
@@ -391,18 +390,16 @@ class Transactions:
         
         try:
             if operation_type == 'insert_one':
-                await self.collection.insert_one(operation['data'], session=self.session)
+                await self.collection.insert_one(operation['data'])
             elif operation_type == 'insert_many':
                 await self.collection.insert_many(operation['data_list'], session=self.session)
             elif operation_type == 'update_one':
                 await self.collection.update_one(
                     operation['filter_query'], 
-                    operation['update_data'],
-                    upsert=operation.get('upsert', False),
-                    session=self.session
+                    operation['update_data']
                 )
             elif operation_type == 'delete_one':
-                await self.collection.delete_one(operation['filter_query'], session=self.session)
+                await self.collection.delete_one(operation['filter_query'])
             elif operation_type == 'delete_many':
                 await self.collection.delete_many(operation['filter_query'], session=self.session)
             else:

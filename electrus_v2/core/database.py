@@ -191,10 +191,6 @@ class Database:
     # -- CRUD for collections --
     @validate_collection_name
     def __getitem__(self, collection_name: str) -> "Collection":
-        if not self.collection_exists(collection_name):
-            raise ElectrusException(
-                f"Collection '{collection_name}' absent in DB '{self.db_name}'"
-            )
         return Collection(
             self.db_name,
             collection_name,

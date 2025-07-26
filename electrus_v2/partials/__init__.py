@@ -1,5 +1,5 @@
 from .insert import InsertData as ElectrusInsertData
-from .find import ElectrusFindData as ElectrusFindData
+from .find import QueryBuilder as ElectrusFindData
 from .objectId import ObjectId as ObjectId
 from .update import UpdateData as ElectrusUpdateData
 from .delete import DeleteData as ElectrusDeleteData

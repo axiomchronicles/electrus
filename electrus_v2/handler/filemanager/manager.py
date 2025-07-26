@@ -58,7 +58,7 @@ class AsyncFileHandler:
             async with aiofiles.open(destination, 'wb') as dst:
                 while chunk := await src.read(chunk_size):
                     await dst.write(chunk)
-                await dst.flush()
+                await dst.flush() 
 
     @staticmethod
     async def process_files_batch(file_operations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

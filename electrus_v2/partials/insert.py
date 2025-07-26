@@ -147,7 +147,7 @@ class InsertData:
             if callable(read):
                 existing = await read(self._file)
             else:
-                existing = self._jf.read(self._file)
+                existing = self._jf.read(self._file, True)
 
             if not isinstance(existing, dict) or "data" not in existing:
                 logger.warning(f"File '{self._file}' is malformed or missing 'data' key. Resetting.")

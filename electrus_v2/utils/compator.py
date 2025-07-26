@@ -4,7 +4,7 @@ import aiofiles
 
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
-from ...exception.base import ElectrusException
+from ..exception.base import ElectrusException
 
 class DataHandler(ABC):
     @abstractmethod

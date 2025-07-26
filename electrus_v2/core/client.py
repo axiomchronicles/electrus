@@ -514,11 +514,6 @@ class ElectrusManager:
         Raises:
             ElectrusException: If database doesn't exist
         """
-        if not self.database_exists(db_name):
-            raise ElectrusException(
-                f"Database '{db_name}' does not exist. "
-                f"Use create_database('{db_name}') to create it first."
-            )
         
         self.logger.debug(f"Accessing database '{db_name}'")
         return Database(db_name, base_path=self.base_path, logger=self.logger)

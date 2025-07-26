@@ -27,13 +27,16 @@ from ..utils import (
 )
 
 from .transactions import Transactions
+from ..handler.filemanager import JsonFileHandler, FileVersionManager, FileLockManager
 
 from ..exception.base import ElectrusException
 
 class Collection:
-    def __init__(self, db_name: str, collection_name: str) -> None:
+    def __init__(self, db_name: str, collection_name: str, db_path: str, logger) -> None:
         self.db_name: str = db_name
         self.collection_name: str = collection_name
+        self.db_path: str = db_path
+        self.logger = logger
         self.base_path: str = os.path.expanduser(f'~/.electrus')
         self.collection_dir_path: str = os.path.join(self.base_path, self.db_name, self.collection_name)
         self.collection_path: str = os.path.join(self.collection_dir_path, f'{self.collection_name}.json')
@@ -43,6 +46,7 @@ class Collection:
         self._create_empty_collection_file()
         self.current_transaction: Optional[str] = None 
         self.session_active: bool = False 
+        self.handler: JsonFileHandler = JsonFileHandler(self.collection_dir_path, FileVersionManager(self.collection_dir_path), FileLockManager())
 
     async def close(self) -> None:
         if not self._connected:
@@ -110,7 +114,7 @@ class Collection:
     async def insert_one(self, data: Dict[str, Any], overwrite: Optional[bool] = False) -> DatabaseActionResult:
         try:
             collection_path = self.collection_path
-            return await ElectrusInsertData(collection_path)._obl_one(data, overwrite)
+            return await ElectrusInsertData(collection_path, self.handler)._obl_one(data, overwrite)
         except Exception as e:
             raise ElectrusException(f"Error inserting data: {e}")
         
@@ -129,18 +133,10 @@ class Collection:
     @_validate_connection
     async def update_many(self, filter_query: Dict[str, Any], update_data: Dict[str, Any]) -> DatabaseActionResult:
         return await ElectrusUpdateData.update(self.collection_path, filter_query, update_data, multi=True)
-    
-    @_validate_connection
-    async def find_one(self, filter_query: Dict[str, Any], projection: List[str] = None) -> DatabaseActionResult:
-        try:
-            collection_path = self.collection_path
-            return await ElectrusFindData(collection_path).find_one(filter_query, projection)
-        except Exception as e:
-            raise ElectrusException(f"Error finding data: {e}")
         
     @_validate_connection
     def find(self) -> ElectrusFindData:
-        return ElectrusFindData(self.collection_path)
+        return ElectrusFindData(self.collection_path, self.handler)
     
     @_validate_connection
     async def count_documents(self, filter_query: Dict[str, Any]) -> int:
