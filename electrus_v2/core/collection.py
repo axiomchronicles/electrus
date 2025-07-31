@@ -122,7 +122,7 @@ class Collection:
     async def insert_many(self, data_list: List[Dict[str, Any]], overwrite: Optional[bool] = False) -> DatabaseActionResult:
         try:
             collection_path = self.collection_path
-            return await ElectrusInsertData(collection_path)._obl_many(data_list, overwrite)
+            return await ElectrusInsertData(collection_path, self.handler)._obl_many(data_list, overwrite)
         except Exception as e:
             raise ElectrusException(f"Error inserting multiple data: {e}")
         

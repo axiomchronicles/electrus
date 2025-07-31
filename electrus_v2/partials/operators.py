@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Union, Callable
 
 from ..exception.base import ElectrusException
 
-# Utility to resolve nested fields via dot notation
 def _get_value(item: Dict[str, Any], path: str) -> Any:
     parts = path.split('.')
     val = item
@@ -55,6 +54,13 @@ class ElectrusLogicalOperators:
         }
 
     def evaluate(self, item: Dict[str, Any], query: Dict[str, Any]) -> bool:
+        if len(query) == 1:
+            top_key, top_value = next(iter(query.items()))
+            if top_key in {"$or", "$and", "$nor"}:
+                return self._handlers[top_key](item, top_key, top_value)
+            if top_key == "$not":
+                return self._handlers["$not"](item, None, top_value)
+    
         for field, crit in query.items():
             if isinstance(crit, dict):
                 for op, val in crit.items():
