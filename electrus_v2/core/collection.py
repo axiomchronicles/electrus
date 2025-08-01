@@ -7,7 +7,8 @@ from typing import (
     Dict,
     List,
     Union,
-    Optional
+    Optional,
+    Callable
 )
 
 from ..partials import (
@@ -127,12 +128,19 @@ class Collection:
             raise ElectrusException(f"Error inserting multiple data: {e}")
         
     @_validate_connection
-    async def update_one(self, filter_query: Dict[str, Any], update_data: Dict[str, Any]) -> DatabaseActionResult:
-        return await ElectrusUpdateData.update(self.collection_path, filter_query, update_data)
+    async def update_one(self, filter_query: Dict[str, Any], update_data: Dict[str, Any],
+    upsert: bool = False,
+    upsert_doc: Dict[str, Any] | None = None,
+    return_updated_fields: List[str] | None = None
+    ) -> DatabaseActionResult:
+        return await ElectrusUpdateData(self.handler).update(self.collection_path, filter_query, update_data, upsert = upsert, upsert_doc = upsert_doc, return_updated_fields = return_updated_fields)
     
     @_validate_connection
-    async def update_many(self, filter_query: Dict[str, Any], update_data: Dict[str, Any]) -> DatabaseActionResult:
-        return await ElectrusUpdateData.update(self.collection_path, filter_query, update_data, multi=True)
+    async def update_many(self, filter_query: Dict[str, Any], update_data: Dict[str, Any], multi: bool = False,
+    upsert: bool = False,
+    upsert_doc: Dict[str, Any] | None = None,
+    return_updated_fields: List[str] | None = None) -> DatabaseActionResult:
+        return await ElectrusUpdateData(self.handler).update(self.collection_path, filter_query, update_data, multi=multi, upsert = upsert, upsert_doc = upsert_doc, return_updated_fields = return_updated_fields)
         
     @_validate_connection
     def find(self) -> ElectrusFindData:
@@ -150,12 +158,12 @@ class Collection:
             raise ElectrusException(f"Error counting documents: {e}")
 
     @_validate_connection
-    async def delete_one(self, filter_query: Dict[str, Any]) -> DatabaseActionResult:
-        return await ElectrusDeleteData.delete(self.collection_path, filter_query)
+    def delete(self) -> ElectrusDeleteData:
+        return ElectrusDeleteData(self.handler, self.collection_path)
     
     @_validate_connection
     async def delete_many(self, filter_query: Dict[str, Any]) -> DatabaseActionResult:
-        return await ElectrusDeleteData.delete(self.collection_path, filter_query, True)
+        return await ElectrusDeleteData(self.handler, self.collection_path).delete(filter_query, True)
     
     @_validate_connection
     async def bulk_operation(self, operations: List[Dict[str, Any]]) -> ElectrusBulkOperation:
@@ -166,9 +174,54 @@ class Collection:
         self,
         field: str,
         filter_query: Optional[Dict[str, Any]] = None,
-        sort: Optional[bool] = False
-    ) -> ElectrusDistinctOperation:
-        return await ElectrusDistinctOperation(self.collection_path)._distinct(field, filter_query, sort)
+        *,
+        sort: bool = False,
+        use_cache: bool = True,
+        statistics: bool = True,
+        use_bloom_filter: bool = True,
+        bloom_capacity: int = 10_000,
+        cache_size: int = 256,
+        cache_ttl: int = 600,
+        on_complete: Optional[Callable[[Union[List[Any], Dict[str, Any]]], None]] = None,
+    ) -> Union[List[Any], Dict[str, Any]]:
+        """
+        Returns distinct values for a given field with optional filtering, sorting,
+        caching, and statistical analysis.
+
+        Args:
+            field (str): The field name to extract distinct values from.
+            filter_query (Optional[Dict[str, Any]]): Mongo-style filter query.
+            sort (bool): Whether to sort the distinct values.
+            use_cache (bool): Use in-memory LRU cache if available.
+            statistics (bool): Return stats like frequency counts and unique %.
+            use_bloom_filter (bool): Use Bloom filter to reduce memory usage.
+            bloom_capacity (int): Bloom filter expected capacity.
+            cache_size (int): Max cache entries.
+            cache_ttl (int): Cache expiration time in seconds.
+            on_complete (Callable): Optional callback on success.
+            on_error (Callable): Optional callback on error.
+
+        Returns:
+            Union[List[Any], Dict[str, Any]]: Distinct values or stats.
+        """
+        builder = ElectrusDistinctOperation(
+            self.collection_path,
+            self.handler,
+            cache_size=cache_size,
+            cache_ttl=cache_ttl,
+            use_bloom_filter=use_bloom_filter,
+            bloom_capacity=bloom_capacity,
+        )
+
+        result: Union[List[Any], Dict[str, Any]]
+        if statistics:
+            result = await builder.distinct_with_stats(field, filter_query, sort)
+        else:
+            result = await builder._distinct(field, filter_query, sort, use_cache)
+
+        if on_complete:
+            on_complete(result)
+        return result
     
     @_validate_connection
     async def import_data(self, file_path: str, append: bool = False) -> None:
@@ -188,15 +241,9 @@ class Collection:
             raise ElectrusException(f"Error exporting data: {e}")
 
     @_validate_connection  
-    async def aggregation(self, pipeline: List[Dict[str, Any]] = None) -> ElectrusAggregation:
+    def aggregation(self):
         try:
-            collection_data = await self._read_collection_data()
-            aggregation = ElectrusAggregation(collection_data)
-            if not pipeline:
-                result = aggregation.execute(pipeline)
-                return result
-            else:
-                return aggregation
+            return ElectrusAggregation(self.collection_path, self.handler)
         except Exception as e:
             raise ElectrusException(f"Error performing aggregation: {e}")
         
