@@ -25,6 +25,10 @@ class BaseResult(ABC):
         """Is this the result of an acknowledged write operation?"""
         return self._acknowledged
     
+    @acknowledged.setter
+    def acknowledged(self, value: bool) -> None:
+        self._acknowledged = value
+    
     @property
     def raw_result(self) -> Mapping[str, Any]:
         """The raw result document returned by the server."""
@@ -183,6 +187,10 @@ class DatabaseActionResult(BaseResult):
         """Whether the operation was successful."""
         return self._success
     
+    @success.setter
+    def success(self, value: bool) -> None:
+        self._success = value
+    
     @property
     def is_successful(self) -> bool:
         """Alias for success property."""
@@ -198,6 +206,10 @@ class DatabaseActionResult(BaseResult):
         """Error information if operation failed."""
         return self._error
     
+    @error.setter
+    def error(self, value: Optional[DatabaseError]) -> None:
+        self._error = value
+
     @property
     def inserted_id(self) -> Optional[Any]:
         """The _id of the inserted document (for single inserts)."""

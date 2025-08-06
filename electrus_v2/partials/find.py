@@ -284,66 +284,108 @@ class QueryBuilder:
         self._computed_fields.append((alias, fn))
         return self
 
+    _OP_ALIASES = {          # map double-underscore suffixes to Mongo ops
+        'eq': '$eq', 'ne': '$ne', 'lt': '$lt', 'lte': '$lte',
+        'gt': '$gt', 'gte': '$gte', 'in': '$in', 'nin': '$nin',
+        'exists': '$exists', 'regex': '$regex', 'startswith': '$like'
+    }
+
+    def _split_lookup(self, key: str) -> Tuple[str, str]:
+        """
+        Split ``foo__bar__lt`` into dotted path ``foo.bar`` and op ``$lt``.
+        Every component except the last becomes part of the path.
+        """
+        parts = key.split('__')
+        if len(parts) < 2 or parts[-1] not in self._OP_ALIASES:
+            return '.'.join(parts), '$eq'          # default equality
+        return '.'.join(parts[:-1]), self._OP_ALIASES[parts[-1]]
+
     def where(self, *args, **kwargs) -> 'QueryBuilder':
         """
-        Add filter using Mongo-style dict or kwargs with __op syntax.
-        Multiple calls combine using $and.
+        Accept dotted paths in look-ups, e.g. ``address__city`` or
+        ``stats__views__gte``. Supports dict form too.
         """
-        self._plan.append(f"WHERE args={args}, kwargs={kwargs}")
+        self._plan.append(f"WHERE {args or kwargs}")
+        new_filter = {}
+        # kwargs style ------------------------------------------------------
+        for key, val in kwargs.items():
+            field, op = self._split_lookup(key)
+            if op == '$eq':
+                new_filter[field] = val
+            else:
+                new_filter.setdefault(field, {})[op] = val
+        # dict style --------------------------------------------------------
         if args:
             if len(args) != 1 or not isinstance(args[0], dict):
-                raise ElectrusException("`.where()` takes either a single dict or only kwargs.")
-            new_filter = args[0]
-        else:
-            new_filter = {}
-            for key, val in kwargs.items():
-                if "__" in key:
-                    field, op = key.split("__", 1)
-                    new_filter.setdefault(field, {})[f"${op}"] = val
+                raise ElectrusException("`.where()` takes a single dict or kwargs.")
+            for key, val in args[0].items():
+                field, op = self._split_lookup(key)
+                if op == '$eq':
+                    new_filter[field] = val
                 else:
-                    new_filter[key] = val
-
-        if not self._mongo_filter:
-            self._mongo_filter = new_filter
-        else:
-            self._mongo_filter = {"$and": [self._mongo_filter, new_filter]}
-
+                    new_filter.setdefault(field, {})[op] = val
+        # merge with existing ----------------------------------------------
+        self._mongo_filter = (
+            new_filter if not self._mongo_filter
+            else {"$and": [self._mongo_filter, new_filter]}
+        )
         if not any(isinstance(f, _MongoFilterWrapper) for f in self._filters):
             logic = ElectrusLogicalOperators()
             self._filters.append(_MongoFilterWrapper(logic, lambda: self._mongo_filter))
-
         return self
+
 
     def or_where(self, *args, **kwargs) -> 'QueryBuilder':
         """
-        Add filter with $or logic combining clauses.
+        Add an OR‐combined filter clause, supporting nested lookups:
+        e.g. .or_where(status='active', address__city='Paris')
         """
+        self._plan.append(f"OR_WHERE {args or kwargs}")
+        new_clauses = []
+
+        # Helper: split django‐style lookup into dotted path + Mongo op
+        def _split_lookup(key: str) -> Tuple[str, str]:
+            parts = key.split('__')
+            if len(parts) > 1 and parts[-1] in self._OP_ALIASES:
+                return '.'.join(parts[:-1]), self._OP_ALIASES[parts[-1]]
+            return '.'.join(parts), '$eq'
+
+        # Build clauses from kwargs
+        for key, val in kwargs.items():
+            field, op = _split_lookup(key)
+            if op == '$eq':
+                new_clauses.append({field: val})
+            else:
+                new_clauses.append({field: {op: val}})
+
+        # Build clauses from dict‐style arg
         if args:
             if len(args) != 1 or not isinstance(args[0], dict):
-                raise ElectrusException("`.or_where()` takes either a single dict or only kwargs.")
-            clause = args[0]
-        else:
-            clause = {}
-            for key, val in kwargs.items():
-                if "__" in key:
-                    field, op = key.split("__", 1)
-                    clause.setdefault(field, {})[f"${op}"] = val
+                raise ElectrusException("`.or_where()` takes a single dict or kwargs.")
+            for key, val in args[0].items():
+                field, op = _split_lookup(key)
+                if op == '$eq':
+                    new_clauses.append({field: val})
                 else:
-                    clause[key] = val
+                    new_clauses.append({field: {op: val}})
 
+        # Merge into the existing mongo filter under $or
         if not self._mongo_filter:
-            self._mongo_filter = {"$or": [clause]}
+            self._mongo_filter = {"$or": new_clauses}
         else:
+            # If there's already an $or at the top, extend it; otherwise wrap both
             if "$or" in self._mongo_filter:
-                self._mongo_filter["$or"].append(clause)
+                self._mongo_filter["$or"].extend(new_clauses)
             else:
-                self._mongo_filter = {"$or": [self._mongo_filter, clause]}
+                self._mongo_filter = {"$or": [self._mongo_filter, *new_clauses]}
 
+        # Ensure we have a MongoFilterWrapper in self._filters
         if not any(isinstance(f, _MongoFilterWrapper) for f in self._filters):
             logic = ElectrusLogicalOperators()
             self._filters.append(_MongoFilterWrapper(logic, lambda: self._mongo_filter))
 
         return self
+
 
     def filter_expr(self, expr: str, **params) -> 'QueryBuilder':
         """Add filter from a raw expression string with parameters."""
@@ -427,21 +469,52 @@ class QueryBuilder:
         return data
 
     def _get(self, doc: Dict, field: str) -> Any:
-        """Get nested field."""
-        return QueryBuilder._json_extract(doc, '$.' + field) if '.' in field or '[' in field else doc.get(field)
+        """Return value for a (possibly dotted/indexed) field."""
+        if '.' in field or '[' in field:
+            return self._json_extract(doc, f'$.{field}')
+        return doc.get(field)
+
 
     @staticmethod
     def _json_extract(doc: Any, path: str) -> Any:
-        parts = re.findall(r"\$|\.?([^.\[\]]+)|\[(\d+)\]", path)
-        curr = doc
-        for key, idx in parts:
-            if key and isinstance(curr, dict):
-                curr = curr.get(key)
-            elif idx and isinstance(curr, list):
-                curr = curr[int(idx)]
-            else:
-                return None
-        return curr
+        """
+        JSONPath-lite extractor that supports:
+        • dot notation  $.a.b.c
+        • list indexes  $.arr[2].x
+        Returns None on any invalid step.
+        """
+        if not path or path == '$':
+            return doc
+        if path.startswith('$'):
+            path = path[1:].lstrip('.')
+
+        # split on dots that are *not* inside brackets
+        for segment in re.split(r'\.(?![^[]*\])', path):
+            if not segment:
+                continue
+            # handle indexes within the segment
+            while True:
+                m = re.match(r'^([^\[\]]+)(?:\[(\d+)\])?$', segment)
+                if not m:
+                    return None
+                key, idx = m.groups()
+                if key:                         # dict lookup
+                    if not isinstance(doc, dict):
+                        return None
+                    doc = doc.get(key)
+                if idx is None:                 # no more indexes
+                    break
+                if not isinstance(doc, list):   # list expected
+                    return None
+                i = int(idx)
+                if i >= len(doc):
+                    return None
+                doc = doc[i]
+                segment = segment[len(key)+len(idx)+2:]  # strip processed part
+                if not segment:
+                    break
+        return doc
+
 
     def _flatten(self, doc: Dict, parent: str = '', sep: str = '.') -> Dict[str, Any]:
         out = {}
@@ -650,12 +723,21 @@ class QueryBuilder:
         self._analysis['project_ms'] = (datetime.now(timezone.utc) - t_proj_start).total_seconds() * 1e3
 
         # Prepare the result object
+        
+
         res = DatabaseActionResult(
             success=True,
             matched_count=len(results),
             raw_result=results,
             inserted_ids=[r.get('_id') for r in results if isinstance(r, dict) and '_id' in r]
         )
+
+        # Enforce failure on no matches
+
+        if res.matched_count == 0:
+            res.success = False
+            res.error = "No matching documents found."
+            res.acknowledged = False
 
         # Post hooks
         for h in self._post_hooks:

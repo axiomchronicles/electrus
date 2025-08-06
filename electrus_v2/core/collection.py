@@ -1,6 +1,6 @@
 import os
 import json
-import aiofiles
+
 
 from typing import (
     Any,
@@ -11,26 +11,29 @@ from typing import (
     Callable
 )
 
+
 from ..partials import (
     ElectrusUpdateData,
     ElectrusInsertData,
     ElectrusFindData,
     ElectrusDeleteData,
-    ElectrusLogicalOperators,
     DatabaseActionResult
 )
+
 
 from ..utils import (
     ElectrusBulkOperation,
     ElectrusDistinctOperation,
-    ElectrusDataComparator,
     ElectrusAggregation
 )
+
 
 from .transactions import Transactions
 from ..handler.filemanager import JsonFileHandler, FileVersionManager, FileLockManager
 
+
 from ..exception.base import ElectrusException
+
 
 class Collection:
     def __init__(self, db_name: str, collection_name: str, db_path: str, logger) -> None:
@@ -49,6 +52,7 @@ class Collection:
         self.session_active: bool = False 
         self.handler: JsonFileHandler = JsonFileHandler(self.collection_dir_path, FileVersionManager(self.collection_dir_path), FileLockManager())
 
+
     async def close(self) -> None:
         if not self._connected:
             raise ElectrusException("Not connected to any database or connection already closed.")
@@ -56,7 +60,9 @@ class Collection:
         self.current_database = None
         self._connected = False
 
+
         return True
+
 
     def _validate_connection(func):
         def wrapper(self, *args, **kwargs):
@@ -70,24 +76,6 @@ class Collection:
         if not os.path.exists(self.collection_path):
             with open(self.collection_path, 'w') as file:
                 file.write(json.dumps([], indent=4))
-
-    @_validate_connection
-    async def _read_collection_data(self) -> List[Dict[str, Any]]:
-        try:
-            if os.path.exists(self.collection_path):
-                async with aiofiles.open(self.collection_path, 'r') as file:
-                    return json.loads(await file.read())
-        except Exception as e:
-            raise ElectrusException(f"Error reading collection data: {e}")
-        return []
-    
-    @_validate_connection
-    async def _write_json(self, data: Any, file_path: str) -> None:
-        try:
-            async with aiofiles.open(file_path, 'w') as file:
-                await file.write(json.dumps(data, indent=4))
-        except Exception as e:
-            raise ElectrusException(f"Error writing to file: {e}")
         
     @_validate_connection
     def transactions(self) -> Transactions:
@@ -95,24 +83,20 @@ class Collection:
     
     @_validate_connection
     async def start_session(self) -> None:
-        """
-        Start a session.
-        """
         if self.session_active:
             raise ElectrusException("Session already active.")
         self.session_active = True
 
+
     @_validate_connection
     async def end_session(self) -> None:
-        """
-        End a session.
-        """
         if not self.session_active:
             raise ElectrusException("No active session.")
         self.session_active = False
 
+
     @_validate_connection
-    async def insert_one(self, data: Dict[str, Any], overwrite: Optional[bool] = False) -> DatabaseActionResult:
+    async def insertOne(self, data: Dict[str, Any], overwrite: Optional[bool] = False) -> DatabaseActionResult:
         try:
             collection_path = self.collection_path
             return await ElectrusInsertData(collection_path, self.handler)._obl_one(data, overwrite)
@@ -120,7 +104,7 @@ class Collection:
             raise ElectrusException(f"Error inserting data: {e}")
         
     @_validate_connection
-    async def insert_many(self, data_list: List[Dict[str, Any]], overwrite: Optional[bool] = False) -> DatabaseActionResult:
+    async def insertMany(self, data_list: List[Dict[str, Any]], overwrite: Optional[bool] = False) :
         try:
             collection_path = self.collection_path
             return await ElectrusInsertData(collection_path, self.handler)._obl_many(data_list, overwrite)
@@ -128,34 +112,30 @@ class Collection:
             raise ElectrusException(f"Error inserting multiple data: {e}")
         
     @_validate_connection
-    async def update_one(self, filter_query: Dict[str, Any], update_data: Dict[str, Any],
+    async def update(self, filter_query: Dict[str, Any], update_data: Dict[str, Any], multi: bool = False,
     upsert: bool = False,
     upsert_doc: Dict[str, Any] | None = None,
     return_updated_fields: List[str] | None = None
     ) -> DatabaseActionResult:
-        return await ElectrusUpdateData(self.handler).update(self.collection_path, filter_query, update_data, upsert = upsert, upsert_doc = upsert_doc, return_updated_fields = return_updated_fields)
+        return await ElectrusUpdateData(self.handler).update(
+            self.collection_path, filter_query, update_data, upsert = upsert, upsert_doc = upsert_doc, return_updated_fields = return_updated_fields, multi = multi
+        )
     
-    @_validate_connection
-    async def update_many(self, filter_query: Dict[str, Any], update_data: Dict[str, Any], multi: bool = False,
-    upsert: bool = False,
-    upsert_doc: Dict[str, Any] | None = None,
-    return_updated_fields: List[str] | None = None) -> DatabaseActionResult:
-        return await ElectrusUpdateData(self.handler).update(self.collection_path, filter_query, update_data, multi=multi, upsert = upsert, upsert_doc = upsert_doc, return_updated_fields = return_updated_fields)
-        
     @_validate_connection
     def find(self) -> ElectrusFindData:
         return ElectrusFindData(self.collection_path, self.handler)
     
     @_validate_connection
-    async def count_documents(self, filter_query: Dict[str, Any]) -> int:
+    async def count(self, filter_query: Dict[str, Any]) -> int:
         try:
-            collection_data = await self._read_collection_data()
+            collection_data = await self.handler.read_async(self.collection_path)
             count = sum(1 for item in collection_data if all(item.get(key) == value for key, value in filter_query.items()))
             return count
         except FileNotFoundError:
             raise ElectrusException(f"Database '{self.db_name}' or collection '{self.collection_name}' not found.")
         except Exception as e:
             raise ElectrusException(f"Error counting documents: {e}")
+
 
     @_validate_connection
     def delete(self) -> ElectrusDeleteData:
@@ -184,26 +164,8 @@ class Collection:
         cache_ttl: int = 600,
         on_complete: Optional[Callable[[Union[List[Any], Dict[str, Any]]], None]] = None,
     ) -> Union[List[Any], Dict[str, Any]]:
-        """
-        Returns distinct values for a given field with optional filtering, sorting,
-        caching, and statistical analysis.
 
-        Args:
-            field (str): The field name to extract distinct values from.
-            filter_query (Optional[Dict[str, Any]]): Mongo-style filter query.
-            sort (bool): Whether to sort the distinct values.
-            use_cache (bool): Use in-memory LRU cache if available.
-            statistics (bool): Return stats like frequency counts and unique %.
-            use_bloom_filter (bool): Use Bloom filter to reduce memory usage.
-            bloom_capacity (int): Bloom filter expected capacity.
-            cache_size (int): Max cache entries.
-            cache_ttl (int): Cache expiration time in seconds.
-            on_complete (Callable): Optional callback on success.
-            on_error (Callable): Optional callback on error.
 
-        Returns:
-            Union[List[Any], Dict[str, Any]]: Distinct values or stats.
-        """
         builder = ElectrusDistinctOperation(
             self.collection_path,
             self.handler,
@@ -213,32 +175,18 @@ class Collection:
             bloom_capacity=bloom_capacity,
         )
 
+
         result: Union[List[Any], Dict[str, Any]]
         if statistics:
             result = await builder.distinct_with_stats(field, filter_query, sort)
         else:
             result = await builder._distinct(field, filter_query, sort, use_cache)
 
+
         if on_complete:
             on_complete(result)
         return result
-    
-    @_validate_connection
-    async def import_data(self, file_path: str, append: bool = False) -> None:
-        try:
-            data_comparator = ElectrusDataComparator()
-            await data_comparator.import_data(file_path, self.collection_path, append)
-        except Exception as e:
-            raise ElectrusException(f"Error importing data: {e}")
-        
-    @_validate_connection
-    async def export_data(self, file_path: str) -> None:
-        try:
-            collection_data = await self._read_collection_data()
-            data_comparator = ElectrusDataComparator()
-            await data_comparator.export_data(file_path, collection_data)
-        except Exception as e:
-            raise ElectrusException(f"Error exporting data: {e}")
+
 
     @_validate_connection  
     def aggregation(self):
@@ -246,4 +194,3 @@ class Collection:
             return ElectrusAggregation(self.collection_path, self.handler)
         except Exception as e:
             raise ElectrusException(f"Error performing aggregation: {e}")
-        

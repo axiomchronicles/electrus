@@ -147,16 +147,20 @@ class InsertData:
     ) -> None:
         for key, raw in list(data.items()):
             try:
-                # 1) $auto is a bare string
+                # Case 1: Bare string operator like "$auto"
                 if raw == FieldOp.AUTO_INC.value:
                     data[key] = await self._registry[FieldOp.AUTO_INC](key, raw, coll)
 
-                # 2) operator is expressed as a one‐key dict, e.g. {"$date_add": "3days"}
+                # Case 2: Dict with single FieldOp key like {"$date_add": "3days"}
                 elif isinstance(raw, dict):
-                    op = FieldOp(next(iter(raw.keys())))
-                    data[key] = await self._registry[op](key, raw, coll)
+                    op_key = next(iter(raw.keys()))
+                    if op_key in FieldOp._value2member_map_:
+                        op = FieldOp(op_key)
+                        data[key] = await self._registry[op](key, raw, coll)
+                    else:
+                        continue  # Skip processing, likely a nested object
 
-                # 3) other bare operators ($time, $datetime, $date, $timestamp)
+                # Case 3: Bare FieldOp strings like "$time", "$date"
                 elif isinstance(raw, str) and raw in {
                     FieldOp.TIME.value,
                     FieldOp.DATETIME.value,
@@ -166,11 +170,10 @@ class InsertData:
                     op = FieldOp(raw)
                     data[key] = await self._registry[op](key, raw, coll)
 
-                # 4) anything else (lists, nested dicts, plain values) stays as-is
+                # Case 4: Everything else — leave as-is
             except Exception as e:
                 logger.error(f"Processor failed for key '{key}': {e}")
                 raise ElectrusException(f"Field '{key}' processor error: {str(e)}") from e
-
 
     async def _safe_read(self) -> dict:
         """Robustly reads collection, handles missing file gracefully."""
