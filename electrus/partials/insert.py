@@ -10,6 +10,7 @@ from .objectId import ObjectId
 from ..exception.base import ElectrusException
 from .results import InsertOneResult, DatabaseActionResult, DatabaseError
 from ..handler.filemanager import JsonFileHandler
+from .indexmanager import ElectrusIndexManager
 
 JsonValue = Union[str, int, Dict[str, Any]]
 Processor = Callable[[str, JsonValue, List[Dict[str, Any]]], Any]
@@ -36,9 +37,11 @@ class InsertData:
         self,
         collection_file: Union[str, Any],
         json_handler: JsonFileHandler,
+        index_manager: ElectrusIndexManager, 
     ) -> None:
         self._file = collection_file
         self._jf = json_handler
+        self._im = index_manager                        # ← store it
         self._registry: Dict[FieldOp, Processor] = {
             FieldOp.AUTO_INC: self._process_auto_inc,
             FieldOp.UNIQUE: self._process_unique_id,
@@ -227,27 +230,28 @@ class InsertData:
         # Extend this method to perform schema validation if needed
 
     def _doc_hash(self, doc: Dict[str, Any]) -> str:
-        """Create a stable hash key for the document."""
+        """Create a stable hash key for the document (ignoring '_id')."""
         try:
-            # Converts document into a sorted tuple of items (key, value)
-            # Values are converted to strings to avoid unhashable issues
-            items = tuple(sorted((k, str(v)) for k, v in doc.items()))
+            # Skip the '_id' field when building the hash
+            items = tuple(
+                sorted((k, str(v)) for k, v in doc.items() if k != "_id")
+            )
             return str(items)
         except Exception as e:
             logger.warning(f"Hashing document failed: {e}")
-            # Fallback: use _id only if present
             return str(doc.get("_id", ""))
+
 
     async def _update_collection_data(
         self, data: Dict[str, JsonValue], overwrite: bool = False
     ) -> DatabaseActionResult:
         """
-        Insert or overwrite a document atomically with robust error handling.
-        Returns a DatabaseActionResult.
+        Insert or overwrite a document atomically, update indexes for any
+        indexed fields, and return a DatabaseActionResult.
         """
         try:
             self._validate_document(data)
-            insert_data = dict(data)  # Defensive copy
+            insert_data = dict(data)  # defensive copy
 
             existing_collection = await self._safe_read()
             coll = existing_collection.get("data", [])
@@ -256,35 +260,49 @@ class InsertData:
             if "_id" not in insert_data:
                 insert_data["_id"] = ObjectId.generate()
 
+            # Apply field processors (e.g., $auto, $date)
             await self._apply_processors(insert_data, coll)
 
-            # Build an index for O(1) _id lookups
-            id_index = {doc["_id"]: idx for idx, doc in enumerate(coll)}
-
-            # Build a hash set for duplicate detection
-            existing_hashes = {self._doc_hash(doc) for doc in coll}
+            # Generate hashes for duplicate detection (ignore _id)
             insert_hash = self._doc_hash(insert_data)
+            existing_hashes = {self._doc_hash(doc) for doc in coll}
 
-            # Duplicate detection
-            if insert_hash in existing_hashes and not overwrite:
-                return DatabaseActionResult.insert_success(
-                    inserted_id=None,
-                    inserted_ids=[],
-                    raw_result={"warning": "duplicate"},
-                )
-
-            # Overwrite or insert
-            if overwrite:
-                idx = id_index.get(insert_data["_id"])
-                if idx is not None:
-                    coll[idx] = insert_data
+            # Check for duplicate
+            if insert_hash in existing_hashes:
+                if not overwrite:
+                    err = DatabaseError("Duplicate document detected", code=409)
+                    return DatabaseActionResult(success = False, acknowledged = False, error = err, operation_type = "insert")
                 else:
-                    coll.append(insert_data)
-            else:
-                coll.append(insert_data)
+                    # Overwrite matching document (by content hash)
+                    for idx, doc in enumerate(coll):
+                        if self._doc_hash(doc) == insert_hash:
+                            insert_data["_id"] = doc["_id"]  # Preserve original _id
+                            coll[idx] = insert_data
+                            await self._safe_write(coll)
 
-            # Write back atomically
+                            # Rebuild index for this document
+                            for fld in self._im.list_indexes():
+                                if fld in insert_data:
+                                    key = insert_data[fld]
+                                    await self._im.delete(fld, key, idx)
+                                    await self._im._insert(fld, key, idx)
+
+                            return DatabaseActionResult.insert_success(
+                                inserted_id=insert_data["_id"],
+                                inserted_ids=[insert_data["_id"]],
+                                raw_result={"operation": "overwrite", "success": True},
+                            )
+
+            # Otherwise, it's a new document
+            coll.append(insert_data)
             await self._safe_write(coll)
+
+            # Insert into indexes
+            doc_index = len(coll) - 1
+            for fld in self._im.list_indexes():
+                if fld in insert_data:
+                    key = insert_data[fld]
+                    await self._im._insert(fld, key, doc_index)
 
             return DatabaseActionResult.insert_success(
                 inserted_id=insert_data["_id"],
@@ -305,6 +323,7 @@ class InsertData:
             logger.critical(f"Uncaught error during insert: {e}", exc_info=True)
             err = DatabaseError(f"Unexpected error: {e}")
             return DatabaseActionResult.failure(err, operation_type="insert")
+
 
     async def _obl_one(
         self, data: Dict[str, JsonValue], overwrite: bool = False

@@ -113,7 +113,7 @@ class ElectrusIndexManager:
         self.metadata[field] = {"root": None, "count":0}
         self._save_metadata()
 
-        docs = await self.collection._read_collection_data()
+        docs = await self.collection.handler.read_async(self.collection.collection_path)
         if bulk:
             # Bulk-load via sorting
             entries = sorted((doc[field],pos) for pos,doc in enumerate(docs) if field in doc)
@@ -155,6 +155,11 @@ class ElectrusIndexManager:
 
     async def _bulk_load(self, fld: str, entries: List[Tuple[Any,int]]):
         # build leaf pages first
+        if not entries:
+            self.metadata[fld]["root"] = None
+            self.metadata[fld]["count"] = 0
+            self._save_metadata()
+            return
         pages = []
         for i in range(0, len(entries), MAX_KEYS):
             chunk = entries[i:i+MAX_KEYS]

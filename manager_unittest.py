@@ -4,7 +4,7 @@ import asyncio
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from electrus_v2.handler.filemanager import AsyncFileHandler, AdvancedFileHandler
+from electrus.handler.filemanager import AsyncFileHandler, AdvancedFileHandler
 
 class TestAdvancedFileHandler(unittest.IsolatedAsyncioTestCase):
 

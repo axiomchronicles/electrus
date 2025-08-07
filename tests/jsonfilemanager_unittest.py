@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from electrus_v2.handler.filemanager.jsonfilemanager import JsonFileHandler
+from electrus.handler.filemanager.jsonfilemanager import JsonFileHandler
 
 
 class TestJsonFileHandler(unittest.IsolatedAsyncioTestCase):

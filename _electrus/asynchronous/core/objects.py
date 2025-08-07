@@ -1,7 +1,7 @@
 import enum
 import getpass
 
-from electrus.asynchronous import partials
+from _electrus.asynchronous import partials
 
 class UserObjectId(enum.Enum):
     provider: str = "electrus@%s" % (getpass.getuser())

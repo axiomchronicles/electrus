@@ -1,88 +1,117 @@
-import asyncio
-from electrus_v2.core.client import Electrus
+from electrus import Electrus
+
+import os
+import enum
+import json
+import hashlib
+import typing
+import dataclasses
 
 client = Electrus()
-database = client["MyTestDb"]
-collection = database["MyTestCollection"]
+database = client["MyTestingDatabase"]
 
-sample_data = [
+collection = database["MyTestingCollection"]
+
+sample_users = [
     {
         "id": 1,
-        "name": "Alice Johnson",
-        "age": 28,
+        "name": "Alice Johnsons",
         "email": "alice@example.com",
+        "password": "hashed_pw_1",
+        "age": 28,
         "address": {
-            "street": "123 Maple Street",
+            "street": "123 Maple St",
             "city": "Springfield",
-            "zip": "62704"
+            "zip": "12345"
         },
-        "interests": ["reading", "hiking", "coding"],
-        "is_active": True,
-        "signup_date": "2024-11-10T14:32:00Z"
+        "roles": ["admin", "editor"],
+        "is_active": True
     },
     {
         "id": 2,
         "name": "Bob Smith",
-        "age": 34,
         "email": "bob@example.com",
+        "password": "hashed_pw_2",
+        "age": 34,
         "address": {
-            "street": "456 Oak Avenue",
-            "city": "Shelbyville",
-            "zip": "61523"
+            "street": "456 Oak Ave",
+            "city": "Riverside",
+            "zip": "67890"
         },
-        "interests": ["gaming", "travel", "cycling"],
-        "is_active": False,
-        "signup_date": "2025-01-22T09:15:00Z"
+        "roles": ["user"],
+        "is_active": True
     },
     {
         "id": 3,
-        "name": "Charlie Doe",
-        "age": 22,
+        "name": "Charlie Davis",
         "email": "charlie@example.com",
+        "password": "hashed_pw_3",
+        "age": 41,
         "address": {
-            "street": "789 Pine Road",
-            "city": "Ogdenville",
-            "zip": "60213"
+            "street": "789 Pine Rd",
+            "city": "Hillview",
+            "zip": "24680"
         },
-        "interests": ["music", "sports"],
-        "is_active": True,
-        "signup_date": "2025-03-05T17:45:00Z"
+        "roles": ["moderator"],
+        "is_active": False
     },
     {
         "id": 4,
-        "name": "Diana Prince",
-        "age": 30,
-        "email": "diana@example.com",
+        "name": "Dana White",
+        "email": "dana@example.com",
+        "password": "hashed_pw_4",
+        "age": 22,
         "address": {
-            "street": "321 Birch Blvd",
-            "city": "Capitol City",
-            "zip": "60606"
+            "street": "101 Cedar Blvd",
+            "city": "Lakeside",
+            "zip": "13579"
         },
-        "interests": ["combat", "history", "justice"],
-        "is_active": True,
-        "signup_date": "2024-12-01T12:00:00Z"
-    },
-    {
-        "id": 5,
-        "name": "Ethan Hunt",
-        "age": 40,
-        "email": "ethan@example.com",
-        "address": {
-            "street": {
-                "name": "Main 2D Street"
-            },
-            "city": "Metroville",
-            "zip": "70001"
-        },
-        "interests": ["espionage", "travel", "skydiving"],
-        "is_active": False,
-        "signup_date": "2023-08-19T08:00:00Z"
+        "roles": ["user", "support"],
+        "is_active": True
     }
 ]
 
-async def main():
-    query = await collection.find().where(id = 6).execute()
-    print(query.error)
+"""
+Helper Functions
+"""
+
+def hashPasswrod(password: str, salt: typing.Optional[str] = None) -> str:
+    salt = os.urandom(10).hex() if not salt else salt
+    obj = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000)
+    return "{}${}".format(salt, obj.hex())
+
+def checkPassword(password: str, hash: str) -> bool:
+    salt, hashObj = hash.split("$")
+    newObj = hashPasswrod(password, salt).split("$")[1]
+    return hashObj == newObj
+
+@dataclasses.dataclass
+class Users:
+    id: int
+    name: str
+    email: str
+    password: str
+
+
+async def handlecollectionOperations():
+    query = await collection.insertMany(data_list = sample_users, overwrite = False)
+    print(query.acknowledged)
+
+    query = await collection.find().select("*").execute()
+    if query.acknowledged:
+        print(json.dumps(query.raw_result, indent=2))
+
+    query = await collection.update(
+        filter = {"age": {"$gt": 30}}, multi = True,
+        update_data = {"$set": {"salary": 30000}}
+    )
+
+    print((await collection.find().select("*").execute()).raw_result)
+
+    query = await collection.delete().where(id = 1).execute()
+    if query.acknowledged:
+        print((await collection.find().select("*").execute()).raw_result)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import asyncio
+    asyncio.run(handlecollectionOperations())

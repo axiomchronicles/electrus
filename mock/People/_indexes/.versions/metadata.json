@@ -1,0 +1,32 @@
+[
+  {
+    "filename": "indexes.json",
+    "size": 2,
+    "checksum": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "checksum_algorithm": "sha256",
+    "created_at": "2025-08-07T00:30:44.788437",
+    "modified_at": "2025-08-07T00:30:44.623751",
+    "version": 1,
+    "permissions": "600"
+  },
+  {
+    "filename": "age.idx",
+    "size": 85,
+    "checksum": "098a974696c0b4e0f4142f7e099bf096362d5ade47e2ffbe718aa6f2a6158c54",
+    "checksum_algorithm": "sha256",
+    "created_at": "2025-08-07T00:30:44.922441",
+    "modified_at": "2025-08-07T00:30:44.922441",
+    "version": 1,
+    "permissions": "644"
+  },
+  {
+    "filename": "indexes.json",
+    "size": 51,
+    "checksum": "37ae27da3604178b7c5bd65497a31ff08c37b516b232398aa35665a2d5cd2992",
+    "checksum_algorithm": "sha256",
+    "created_at": "2025-08-07T00:30:44.920441",
+    "modified_at": "2025-08-07T00:30:44.873073",
+    "version": 2,
+    "permissions": "600"
+  }
+]
