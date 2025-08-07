@@ -60,30 +60,35 @@ collection = database['mycollection']
 
 import asyncio
 
-import electrus.asynchronous as electrus
+import electrus as electrus
 from electrus.exception import ElectrusException
 
 client = electrus.Electrus()
 database = client['mydb']
 collection = database['mycollection']
 
-async def main():
-  data = {
-    "id": "auto_inc",
-    "name": "Embrake | Electrus",
-    "email": ["embrakeproject@gmail.com", "control@vvfin.in"],
-    "role": "user"
-  }
+async def handlecollectionOperations():
+    query = await collection.insertMany(data_list = sample_users, overwrite = False)
+    print(query.acknowledged)
 
-  try:
-    query = await collection.insert_one(data)
-    if query:
-      print("Data inserted successfully!")
-  except ElectrusException as e:
-    print("Something went wrong {}".format(e))
+    query = await collection.find().select("*").execute()
+    if query.acknowledged:
+        print(json.dumps(query.raw_result, indent=2))
+
+    query = await collection.update(
+        filter = {"age": {"$gt": 30}}, multi = True,
+        update_data = {"$set": {"salary": 30000}}
+    )
+
+    print((await collection.find().select("*").execute()).raw_result)
+
+    query = await collection.delete().where(id = 1).execute()
+    if query.acknowledged:
+        print((await collection.find().select("*").execute()).raw_result)
 
 if __name__ == "__main__":
-  asyncio.run(main())
+    import asyncio
+    asyncio.run(handlecollectionOperations())
 
 ```
 `run the script`
@@ -131,3 +136,42 @@ The complete documantation available at [http://electrus.vvfin.in](http://electr
 ## Support
 
 For any help and support feel free to contact us at `embrakeproject@gmail.com` or `control@vvfin.in`
+
+## 🧰 Feature Roadmap
+
+| Feature                | Status      |
+| ---------------------- | ----------- |
+| ✅ Atomic Write Engine  | Complete    |
+| ✅ Smart Insert Logic   | Complete    |
+| ✅ Modular I/O Layer    | Complete    |
+| 🔄 Transaction Support | In Progress |
+| 🔄 Advanced Query Ops  | In Progress |
+| 🧪 Middleware Engine   | In Progress |
+
+Have ideas? [Submit a GitHub Issue](https://github.com/axiomchronicles/electrus/issues)
+
+---
+
+## ❤️ Sponsor Electrus
+
+Great open-source needs great community support.
+
+If Electrus saves you time, sanity, or money — consider sponsoring:
+
+[![Sponsor on GitHub](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-ff69b4?style=for-the-badge\&logo=github)](https://github.com/sponsors/axiomchronicles)
+
+> Every donation goes toward feature development, maintenance, and coffee ☕.
+
+---
+
+## 🔓 License
+
+Electrus is open-source under the **BSD License** — flexible, permissive, and production-ready.
+
+---
+
+## 🎨 Final Thoughts
+
+> Electrus was crafted for those who care about code elegance, data safety, and developer happiness.
+
+<p align="center"><strong>⚡ Electrus — Build fearlessly. Code beautifully.</strong></p>
