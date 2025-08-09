@@ -722,14 +722,20 @@ class QueryBuilder:
                 results.append(rec)
         self._analysis['project_ms'] = (datetime.now(timezone.utc) - t_proj_start).total_seconds() * 1e3
 
-        # Prepare the result object
-        
+        # --- Add unwrapping logic here ---
+        single = None
+        if len(results) == 1:
+            single = results[0]
+        # --- End unwrapping logic ---
 
+        # Prepare the result object
         res = DatabaseActionResult(
             success=True,
             matched_count=len(results),
-            raw_result=results,
-            inserted_ids=[r.get('_id') for r in results if isinstance(r, dict) and '_id' in r]
+            # If exactly one result, return a dict; otherwise a list
+            raw_result=single if single is not None else results,
+            inserted_ids=[r.get('_id') for r in (results if single is None else [single])
+                          if isinstance(r, dict) and '_id' in r]
         )
 
         # Enforce failure on no matches

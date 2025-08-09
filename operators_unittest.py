@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime
-from electrus.partials.operators import ElectrusLogicalOperators, ElectrusUpdateOperators
+from axiomelectrus.partials.operators import ElectrusLogicalOperators, ElectrusUpdateOperators
 
 
 class TestElectrusLogicalOperators(unittest.TestCase):

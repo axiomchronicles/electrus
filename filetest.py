@@ -1,4 +1,4 @@
-from electrus import Electrus
+from axiomelectrus import Electrus
 
 import os
 import enum

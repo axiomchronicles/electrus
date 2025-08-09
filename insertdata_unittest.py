@@ -1,8 +1,8 @@
 import unittest
 from datetime import datetime
 
-from electrus.partials.insert import InsertData, FieldOp
-from electrus.partials.results import DatabaseActionResult
+from axiomelectrus.partials.insert import InsertData, FieldOp
+from axiomelectrus.partials.results import DatabaseActionResult
 
 # Dummy in-memory handler
 class DummyJsonHandler:
